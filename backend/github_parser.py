@@ -14,7 +14,7 @@ ALLOWED_EXTENSIONS = {
 }
 
 MAX_FILE_SIZE_BYTES = 50_000   # 50KB per file
-MAX_TOTAL_CHARS    = 80_000    # total context cap
+MAX_TOTAL_CHARS     = 80_000    # total context cap
 
 
 def _extract_owner_repo(github_url: str) -> tuple[str, str]:
@@ -113,17 +113,7 @@ def parse_github_repo(github_url: str) -> dict:
             break
         content = _fetch_file_content(owner, repo, path)
         if content:
-            snippet = f"### {path}\n```\n{content[:3000]}\n```\n\n"
-            context_parts.append(snippet)
-            total_chars += len(snippet)
+            snippet = f"### {path}\n
+http://googleusercontent.com/immersive_entry_chip/0
 
-    return {
-        "file_tree": file_tree,
-        "repo_context": "".join(context_parts),
-        "readme": readme,
-        "repo_name": f"{owner}/{repo}",
-<<<<<<< HEAD
-    }
-=======
-    }
->>>>>>> eade00dfe17ef9cfe30c002f6a61978f4f720ec6
+Iske baad Render automatically deploy utha lega aur is baar wo "Syntax Error" nahi aayega. Backend live hote hi batao!
