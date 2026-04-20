@@ -114,6 +114,3 @@ def parse_github_repo(github_url: str) -> dict:
         content = _fetch_file_content(owner, repo, path)
         if content:
             snippet = f"### {path}\n
-http://googleusercontent.com/immersive_entry_chip/0
-
-Iske baad Render automatically deploy utha lega aur is baar wo "Syntax Error" nahi aayega. Backend live hote hi batao!
