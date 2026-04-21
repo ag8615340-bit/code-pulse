@@ -3,8 +3,6 @@ import requests
 import base64
 from typing import Any
 
-# Purana HEADERS wala line delete kar dena, uski zarurat nahi hai yahan
-
 ALLOWED_EXTENSIONS = {
     ".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs",
     ".java", ".cpp", ".c", ".cs", ".rb", ".php",
@@ -15,7 +13,6 @@ ALLOWED_EXTENSIONS = {
 MAX_FILE_SIZE_BYTES = 50_000
 MAX_TOTAL_CHARS = 80_000
 
-# Ek helper function jo har baar naya token aur header generate karega
 def get_headers():
     token = os.getenv("GITHUB_TOKEN", "")
     if token:
@@ -31,14 +28,12 @@ def _extract_owner_repo(github_url: str) -> tuple[str, str]:
 
 def _fetch_tree(owner: str, repo: str) -> list[dict]:
     url = f"https://api.github.com/repos/{owner}/{repo}/git/trees/HEAD?recursive=1"
-    # Yahan HEADERS ki jagah get_headers() call kiya hai
     resp = requests.get(url, headers=get_headers(), timeout=15)
     resp.raise_for_status()
     return resp.json().get("tree", [])
 
 def _fetch_file_content(owner: str, repo: str, path: str) -> str | None:
     url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
-    # Yahan bhi HEADERS ki jagah get_headers() call kiya hai
     resp = requests.get(url, headers=get_headers(), timeout=10)
     if resp.status_code != 200:
         return None
@@ -49,5 +44,65 @@ def _fetch_file_content(owner: str, repo: str, path: str) -> str | None:
     except Exception:
         return None
 
-# Baki saara code (build_tree_nodes, fetch_readme, parse_github_repo) 
-# bilkul waisa hi rahega jaisa aapne diya hai... niche paste kar dena.
+def _build_tree_nodes(flat_tree: list[dict]) -> list[dict]:
+    root: dict[str, Any] = {"name": "root", "path": "", "type": "dir", "children": []}
+
+    def get_or_create_dir(parts: list[str], node: dict) -> dict:
+        if not parts:
+            return node
+        name = parts[0]
+        for child in node["children"]:
+            if child["name"] == name and child["type"] == "dir":
+                return get_or_create_dir(parts[1:], child)
+        new_dir = {"name": name, "path": "/".join(parts), "type": "dir", "children": []}
+        node["children"].append(new_dir)
+        return get_or_create_dir(parts[1:], new_dir)
+
+    for item in flat_tree:
+        if item["type"] == "tree":
+            continue
+        path = item["path"]
+        parts = path.split("/")
+        parent = get_or_create_dir(parts[:-1], root) if len(parts) > 1 else root
+        ext = os.path.splitext(parts[-1])[1].lower()
+        if ext in ALLOWED_EXTENSIONS:
+            parent["children"].append({
+                "name": parts[-1],
+                "path": path,
+                "type": "file",
+                "children": []
+            })
+    return root["children"]
+
+def _fetch_readme(owner: str, repo: str) -> str:
+    for name in ["README.md", "readme.md", "Readme.md"]:
+        content = _fetch_file_content(owner, repo, name)
+        if content:
+            return content[:3000]
+    return "No README found."
+
+def parse_github_repo(github_url: str) -> dict:
+    owner, repo = _extract_owner_repo(github_url)
+    flat_tree = _fetch_tree(owner, repo)
+    file_tree = _build_tree_nodes(flat_tree)
+    readme = _fetch_readme(owner, repo)
+
+    context_parts = [f"# Repository: {owner}/{repo}\n"]
+    context_parts.append(f"## README\n{readme}\n\n## Source Files\n")
+    total_chars = sum(len(p) for p in context_parts)
+
+    for item in flat_tree:
+        if item["type"] != "blob":
+            continue
+        if total_chars >= MAX_TOTAL_CHARS:
+            break
+        path = item["path"]
+        ext = os.path.splitext(path)[1].lower()
+        if ext not in ALLOWED_EXTENSIONS:
+            continue
+        content = _fetch_file_content(owner, repo, path)
+        if content:
+            snippet = f"### {path}\n
+http://googleusercontent.com/immersive_entry_chip/0
+
+#Bhai, is baar ek baar dhyan se copy karna, end mein `#` zaroori hai. Ab push karo, ye pakka chalega!
