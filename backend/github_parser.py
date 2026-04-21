@@ -3,6 +3,9 @@ import requests
 import base64
 from typing import Any
 
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
+HEADERS = {"Authorization": f"token {GITHUB_TOKEN}"} if GITHUB_TOKEN else {}
+
 ALLOWED_EXTENSIONS = {
     ".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs",
     ".java", ".cpp", ".c", ".cs", ".rb", ".php",
@@ -10,13 +13,9 @@ ALLOWED_EXTENSIONS = {
     ".md", ".txt", ".sql",
 }
 
+MAX_FILE_SIZE_BYTES = 50_000
 MAX_TOTAL_CHARS = 80_000
 
-def get_headers():
-    token = os.getenv("GITHUB_TOKEN", "")
-    if token:
-        return {"Authorization": f"token {token}"}
-    return {}
 
 def _extract_owner_repo(github_url: str) -> tuple[str, str]:
     url = github_url.rstrip("/").replace("https://github.com/", "").replace("http://github.com/", "")
@@ -25,15 +24,17 @@ def _extract_owner_repo(github_url: str) -> tuple[str, str]:
         raise ValueError("Invalid GitHub URL")
     return parts[0], parts[1]
 
+
 def _fetch_tree(owner: str, repo: str) -> list[dict]:
     url = f"https://api.github.com/repos/{owner}/{repo}/git/trees/HEAD?recursive=1"
-    resp = requests.get(url, headers=get_headers(), timeout=15)
+    resp = requests.get(url, headers=HEADERS, timeout=15)
     resp.raise_for_status()
     return resp.json().get("tree", [])
 
+
 def _fetch_file_content(owner: str, repo: str, path: str) -> str | None:
     url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
-    resp = requests.get(url, headers=get_headers(), timeout=10)
+    resp = requests.get(url, headers=HEADERS, timeout=10)
     if resp.status_code != 200:
         return None
     data = resp.json()
@@ -42,6 +43,7 @@ def _fetch_file_content(owner: str, repo: str, path: str) -> str | None:
         return base64.b64decode(raw).decode("utf-8", errors="replace")
     except Exception:
         return None
+
 
 def _build_tree_nodes(flat_tree: list[dict]) -> list[dict]:
     root: dict[str, Any] = {"name": "root", "path": "", "type": "dir", "children": []}
@@ -71,7 +73,9 @@ def _build_tree_nodes(flat_tree: list[dict]) -> list[dict]:
                 "type": "file",
                 "children": []
             })
+
     return root["children"]
+
 
 def _fetch_readme(owner: str, repo: str) -> str:
     for name in ["README.md", "readme.md", "Readme.md"]:
@@ -79,6 +83,7 @@ def _fetch_readme(owner: str, repo: str) -> str:
         if content:
             return content[:3000]
     return "No README found."
+
 
 def parse_github_repo(github_url: str) -> dict:
     owner, repo = _extract_owner_repo(github_url)
@@ -101,4 +106,13 @@ def parse_github_repo(github_url: str) -> dict:
             continue
         content = _fetch_file_content(owner, repo, path)
         if content:
-            snippet = f"### {path}\n
+            snippet = "### " + path + "\n```\n" + content[:3000] + "\n```\n\n"
+            context_parts.append(snippet)
+            total_chars += len(snippet)
+
+    return {
+        "file_tree": file_tree,
+        "repo_context": "".join(context_parts),
+        "readme": readme,
+        "repo_name": f"{owner}/{repo}",
+    }
