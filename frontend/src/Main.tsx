@@ -1,3 +1,4 @@
+/* transition: all 0.3s ease; */
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./style.css";
