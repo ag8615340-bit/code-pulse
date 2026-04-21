@@ -3,7 +3,7 @@ import RepoInput from "./components/RepoInput";
 import FileTree, { FileNode } from "./components/FileTree";
 import ChatBox, { ChatMessage } from "./components/ChatBox";
 
-const API_BASE = "https://codeboard-tlwd.onrender.com";
+const API_BASE = "https://code-pulse-backend-zc4z.onrender.com";
 
 export default function App() {
   const [repoUrl, setRepoUrl]         = useState("");
