@@ -1,16 +1,12 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
+// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  // Agar ye line nahi hai toh ise add karo
-  assetsInclude: ['**/*.css'], 
+  // assetsInclude wali line hata di hai kyunki CSS default handle hoti hai
   build: {
-    rollupOptions: {
-      output: {
-        // Isse cache clear hota hai aur naya build banta hai
-        manualChunks: undefined,
-      },
-    },
+    outDir: 'dist',
+    sourcemap: false,
   },
 });
