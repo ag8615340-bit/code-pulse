@@ -44,7 +44,7 @@ def _extract_relevant_files(answer: str) -> list[str]:
 
 def get_ai_response(question: str, repo_context: str, chat_history: list[dict]) -> dict:
     messages: list[dict] = [
-        {"role": "system", "content": f"{SYSTEM_PROMPT}\n\n---\n\n{repo_context}"},
+        {"role": "system", "content": f"{SYSTEM_PROMPT}\n\n---\n\n{repo_context[:8000]}"},
     ]
     for msg in chat_history[-6:]:
         if msg["role"] in ("user", "assistant"):
