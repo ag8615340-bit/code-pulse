@@ -102,6 +102,4 @@ def parse_github_repo(github_url: str) -> dict:
             continue
         content = _fetch_file_content(owner, repo, path)
         if content:
-            snippet = f"### {path}\n
-http://googleusercontent.com/immersive_entry_chip/0
-
+            snippet = f"### {path}\n"
