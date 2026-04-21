@@ -64,8 +64,4 @@ def get_ai_response(question: str, repo_context: str, chat_history: list[dict]) 
     return {
         "answer": answer,
         "relevant_files": relevant_files,
-<<<<<<< HEAD
     }
-=======
-    }
->>>>>>> eade00dfe17ef9cfe30c002f6a61978f4f720ec6
