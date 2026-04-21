@@ -10,7 +10,6 @@ ALLOWED_EXTENSIONS = {
     ".md", ".txt", ".sql",
 }
 
-MAX_FILE_SIZE_BYTES = 50_000
 MAX_TOTAL_CHARS = 80_000
 
 def get_headers():
@@ -102,4 +101,4 @@ def parse_github_repo(github_url: str) -> dict:
             continue
         content = _fetch_file_content(owner, repo, path)
         if content:
-            snippet = f"### {path}\n"
+            snippet = f"### {path}\n
