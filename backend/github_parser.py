@@ -105,4 +105,3 @@ def parse_github_repo(github_url: str) -> dict:
             snippet = f"### {path}\n
 http://googleusercontent.com/immersive_entry_chip/0
 
-#Bhai, is baar ek baar dhyan se copy karna, end mein `#` zaroori hai. Ab push karo, ye pakka chalega!
