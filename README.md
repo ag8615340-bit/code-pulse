@@ -11,6 +11,8 @@ Code-Pulse is an AI-powered full-stack platform that acts as your personal **Tec
 🔗 **[Try Code-Pulse Live →](https://code-pulse-orcin.vercel.app/)**
 📁 **[View Source Code →](https://github.com/ag8615340-bit/code-pulse)**
 
+⚡ Note: The backend is hosted on Render (Free Tier). It may take about 30 seconds to "spin up" on the first request if the server is sleeping. Thank you for your patience!
+
 ---
 
 ## ✨ What It Does
