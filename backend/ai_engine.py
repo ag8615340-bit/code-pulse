@@ -1,3 +1,4 @@
+
 import os
 import re
 import logging
@@ -9,39 +10,63 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+# --------------------------------------------------
+# GROQ CONFIGURATION
+# --------------------------------------------------
+
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 if not GROQ_API_KEY:
     raise RuntimeError(
-        "GROQ_API_KEY is missing. Set it in your environment variables."
+        "GROQ_API_KEY is missing. "
+        "Set it in your environment variables."
     )
 
 client = Groq(api_key=GROQ_API_KEY)
 
 MODEL = "openai/gpt-oss-120b"
 
+
+# --------------------------------------------------
+# SYSTEM PROMPT
+# --------------------------------------------------
+
 SYSTEM_PROMPT = """You are an expert software engineer and codebase guide.
-You have been given the source code and structure of a GitHub repository.
-Your job is to help NEW DEVELOPERS understand this codebase quickly.
+
+You help new developers understand a GitHub repository
+using the repository context provided in the conversation.
 
 Guidelines:
 - Answer clearly and concisely.
-- Always mention EXACT file paths when referring to code.
-- If asked about architecture, explain the high-level flow first, then details.
-- If you reference code, use markdown code blocks.
-- At the end of every answer, list 1-3 relevant file paths under
-  "📁 Relevant Files:".
-- Be friendly but precise — you are a senior developer helping a junior.
+- Use exact file paths when they are present in the context.
+- Never invent file paths, function names, line numbers,
+  endpoints, code snippets, or repository details.
+- If exact source evidence is missing, clearly say so.
+- If asked about architecture, explain the high-level
+  flow first, then the details.
+- Only show code snippets that are present in the
+  provided repository context.
+- At the end of every answer, list 1-3 relevant
+  file paths under "📁 Relevant Files:".
+- Be friendly but precise.
 
-You ONLY answer questions related to the provided repository.
-If asked something unrelated, politely redirect.
+You ONLY answer questions related to the provided
+repository. If asked something unrelated, politely
+redirect the user.
 """
 
+
+# --------------------------------------------------
+# RELEVANT FILE EXTRACTION
+# --------------------------------------------------
 
 def _extract_relevant_files(answer: str) -> list[str]:
     """Extract likely file paths mentioned in the AI response."""
 
-    pattern = r"`([^`]+\.[a-zA-Z]{1,6})`"
+    if not answer:
+        return []
+
+    pattern = r"`([^`\n]+\.[a-zA-Z0-9]{1,10})`"
     matches = re.findall(pattern, answer)
 
     section = re.findall(
@@ -52,7 +77,7 @@ def _extract_relevant_files(answer: str) -> list[str]:
 
     if section:
         paths = re.findall(
-            r"[`\-\*]?\s*([^\s`\n]+\.[a-zA-Z]{1,6})",
+            r"[`\-\*]?\s*([^\s`\n]+\.[a-zA-Z0-9]{1,10})",
             section[0],
         )
         matches.extend(paths)
@@ -61,13 +86,18 @@ def _extract_relevant_files(answer: str) -> list[str]:
     result: list[str] = []
 
     for match in matches:
-        cleaned = match.strip().strip(".,;:")
+        cleaned = match.strip().strip(".,;:()")
+
         if cleaned and cleaned not in seen:
             seen.add(cleaned)
             result.append(cleaned)
 
     return result[:5]
 
+
+# --------------------------------------------------
+# AI RESPONSE GENERATION
+# --------------------------------------------------
 
 def get_ai_response(
     question: str,
@@ -78,7 +108,7 @@ def get_ai_response(
     Generate a repository-grounded response using Groq.
     """
 
-    if not question or not question.strip():
+    if not isinstance(question, str) or not question.strip():
         raise ValueError("Question cannot be empty.")
 
     if not isinstance(repo_context, str):
@@ -95,7 +125,10 @@ def get_ai_response(
         }
     ]
 
-    # Add recent conversation history.
+    # --------------------------------------------------
+    # ADD RECENT CHAT HISTORY
+    # --------------------------------------------------
+
     for msg in (chat_history or [])[-6:]:
         if not isinstance(msg, dict):
             continue
@@ -103,7 +136,11 @@ def get_ai_response(
         role = msg.get("role")
         content = msg.get("content")
 
-        if role in ("user", "assistant") and isinstance(content, str):
+        if (
+            role in ("user", "assistant")
+            and isinstance(content, str)
+            and content.strip()
+        ):
             messages.append(
                 {
                     "role": role,
@@ -111,7 +148,10 @@ def get_ai_response(
                 }
             )
 
-    # Add the current question.
+    # --------------------------------------------------
+    # ADD CURRENT QUESTION
+    # --------------------------------------------------
+
     messages.append(
         {
             "role": "user",
@@ -119,17 +159,54 @@ def get_ai_response(
         }
     )
 
+    # --------------------------------------------------
+    # CALL GROQ API
+    # --------------------------------------------------
+
     try:
         response = client.chat.completions.create(
             model=MODEL,
             messages=messages,
-            max_completion_tokens=1024,
+            reasoning_effort="low",
+            max_completion_tokens=4096,
         )
 
-        answer = response.choices[0].message.content
+        if not response.choices:
+            logger.error(
+                "Groq returned no choices. Model: %s",
+                MODEL,
+            )
 
-        if not answer:
-            answer = "Sorry, I couldn't generate a response."
+            return {
+                "answer": (
+                    "The AI returned no response. "
+                    "Please try again."
+                ),
+                "relevant_files": [],
+            }
+
+        choice = response.choices[0]
+        message = choice.message
+
+        answer = message.content
+
+        # --------------------------------------------------
+        # HANDLE EMPTY RESPONSE
+        # --------------------------------------------------
+
+        if not answer or not answer.strip():
+            logger.warning(
+                "Groq returned empty content. "
+                "Model: %s, finish_reason: %s",
+                MODEL,
+                choice.finish_reason,
+            )
+
+            answer = (
+                "The AI returned an empty response. "
+                "Please try asking your question again. "
+                "If this continues, check the server logs."
+            )
 
         relevant_files = _extract_relevant_files(answer)
 
@@ -138,8 +215,11 @@ def get_ai_response(
             "relevant_files": relevant_files,
         }
 
+    # --------------------------------------------------
+    # ERROR LOGGING
+    # --------------------------------------------------
+
     except Exception:
-        # Logs the traceback without printing the API key.
         logger.exception(
             "Groq API request failed. Model: %s",
             MODEL,
