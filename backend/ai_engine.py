@@ -8,7 +8,7 @@ load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 client = Groq(api_key=GROQ_API_KEY)
 
-MODEL = "llama-3.3-70b-versatile"
+MODEL = "openai/gpt-oss-120b"
 
 SYSTEM_PROMPT = """You are an expert software engineer and codebase guide.
 You have been given the full source code and structure of a GitHub repository.
