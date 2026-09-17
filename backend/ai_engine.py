@@ -1,4 +1,3 @@
-
 import os
 import re
 import logging
@@ -25,13 +24,6 @@ if not GROQ_API_KEY:
 client = Groq(api_key=GROQ_API_KEY)
 
 MODEL = "openai/gpt-oss-120b"
-
-# Maximum repository context passed to the model.
-# The parser currently limits the complete repository
-# context, so this should be adjusted if that limit changes.
-MAX_REPO_CONTEXT_CHARS = int(
-    os.getenv("MAX_REPO_CONTEXT_CHARS", "60000")
-)
 
 MAX_HISTORY_MESSAGES = 6
 MAX_HISTORY_MESSAGE_CHARS = 4000
@@ -340,43 +332,6 @@ def _sanitize_chat_history(
 
 
 # --------------------------------------------------
-# REPOSITORY CONTEXT PREPARATION
-# --------------------------------------------------
-
-def _prepare_repo_context(repo_context: str) -> str:
-    """
-    Prepare repository context without silently pretending
-    that truncated content is complete.
-    """
-
-    if not isinstance(repo_context, str):
-        raise TypeError("repo_context must be a string.")
-
-    context = repo_context.strip()
-
-    if not context:
-        return ""
-
-    if len(context) > MAX_REPO_CONTEXT_CHARS:
-        logger.warning(
-            "Repository context exceeds configured limit. "
-            "Original chars: %s, limit: %s",
-            len(context),
-            MAX_REPO_CONTEXT_CHARS,
-        )
-
-        context = (
-            context[:MAX_REPO_CONTEXT_CHARS]
-            + "\n\n"
-            + "[WARNING: Repository context was truncated "
-              "before being sent to the AI. Some files or "
-              "source lines may be missing.]"
-        )
-
-    return context
-
-
-# --------------------------------------------------
 # AI RESPONSE GENERATION
 # --------------------------------------------------
 
@@ -406,7 +361,9 @@ def get_ai_response(
 
     question = question.strip()
 
-    prepared_context = _prepare_repo_context(repo_context)
+    # CHANGED: Use the full repository context without
+    # the previous MAX_REPO_CONTEXT_CHARS truncation.
+    prepared_context = repo_context.strip()
 
     if not prepared_context:
         raise ValueError("Repository context is empty.")
