@@ -1,7 +1,9 @@
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
+from starlette.concurrency import run_in_threadpool
 import os
 from dotenv import load_dotenv
 from github_parser import parse_github_repo
@@ -14,7 +16,7 @@ app = FastAPI(title="Codebase Onboarding Assistant", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -29,13 +31,13 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     question: str
     repo_context: str
-    chat_history: Optional[List[ChatMessage]] = []
+    chat_history: Optional[List[ChatMessage]] = Field(default_factory=list)
 
 class FileNode(BaseModel):
     name: str
     path: str
     type: str
-    children: Optional[List["FileNode"]] = []
+    children: Optional[List["FileNode"]] = Field(default_factory=list)
 
 FileNode.model_rebuild()
 
@@ -56,25 +58,47 @@ def root():
 @app.post("/api/parse-repo", response_model=RepoResponse)
 async def parse_repo(request: RepoRequest):
     try:
-        result = parse_github_repo(request.github_url)
+        result = await run_in_threadpool(
+            parse_github_repo,
+            request.github_url,
+        )
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to parse repo: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to parse repo: {str(e)}",
+        )
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     if not request.question.strip():
-        raise HTTPException(status_code=400, detail="Question cannot be empty")
+        raise HTTPException(
+            status_code=400,
+            detail="Question cannot be empty",
+        )
+
     if not request.repo_context.strip():
-        raise HTTPException(status_code=400, detail="Repo context is missing")
+        raise HTTPException(
+            status_code=400,
+            detail="Repo context is missing",
+        )
+
     try:
-        result = get_ai_response(
+        result = await run_in_threadpool(
+            get_ai_response,
             question=request.question,
             repo_context=request.repo_context,
-            chat_history=[msg.model_dump() for msg in request.chat_history],
+            chat_history=[
+                msg.model_dump()
+                for msg in request.chat_history
+            ],
         )
         return result
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI engine error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"AI engine error: {str(e)}",
+        )
